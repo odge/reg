@@ -23,6 +23,10 @@ Definition eq_type_dec : forall τ σ : type, {τ = σ} + {τ <> σ}.
 decide equality.
 Defined.
 
+Definition eq_type : forall τ σ : type, τ = σ \/ τ <> σ.
+decide equality.
+Defined.
+
 Section Reg.
 
 Variable Φ : type.
@@ -76,6 +80,21 @@ match goal with
 end.
 Defined.
 
+
+Ltac specializer :=
+  (match goal with Q : ?x = ?y |- _ =>
+     (subst x || subst y); clear Q end) ||
+  (match goal with Q : @INeq _ _ ?i ?x ?i ?y |- _ =>
+     let Q' := fresh "Q'" in
+       assert (x = y) as Q' by apply (INeq_eq eq_type_dec Q);
+         clear Q end) ||
+  (match goal with Q : ?i = ?i |- _ =>
+     rewrite (eq_proofs_unicity (eq_Fin params) Q (refl_equal _)) in *;
+       clear Q; simpl in * end).
+
+Ltac finish :=
+  exact I || reflexivity || assumption.
+
 Definition value_compare (ρ : type) (x y : value ρ) : Compare (value_lt ρ) (@eq (value ρ)) x y.
 refine (fix value_compare (ρ : type) (x y : value ρ) {struct x} : Compare (value_lt ρ) (@eq (value ρ)) x y := _).
 refine (
@@ -110,7 +129,9 @@ refine (
     | Inl τ σ l, Inl τ' σ' l' => fun e1 e2 e3 e4 e5 =>
       let Q := _ in
       match value_compare τ l (cast value τ Q l') with
-        | LT _ => LT _ _ | EQ _ => EQ _ _ | GT _ => GT _ _
+        | LT _ => LT _ _
+        | EQ _ => EQ _ _
+        | GT _ => GT _ _
       end
     | Inl τ σ l, Inr τ' σ' r' => fun e1 e2 e3 e4 e5 => LT _ _
     
@@ -145,9 +166,40 @@ match goal with
   | |- False => discriminate
   | _ => congruence
 end;
-try subst;
-repeat match goal with Q : INeq _ _ _ |- _ => rewrite Q; [ apply eq_type_dec | clear Q ] end.
-(* pattern match specialization and proofs *)
+try solve [ repeat specializer; finish ].
+
+Lemma lt_irreflexive n : forall i j : Fin n, Fin_lt n i j -> i <> j.
+Admitted.
+Lemma lt_asymm n : forall i j : Fin n, Fin_lt n i j -> Fin_lt n j i -> False.
+Admitted.
+
+
+repeat specializer; simpl.
+destruct (Fin_compare params i i').
+exact I.
+elim (lt_irreflexive _ _ _ f e).
+elim (lt_asymm _ _ _ f f0).
+
+repeat specializer.
+destruct (Fin_compare params i' i').
+elim (lt_irreflexive _ _ _ f (refl_equal _)).
+specializer; assumption.
+elim (lt_irreflexive _ _ _ f (refl_equal _)).
+
+repeat specializer.
+destruct (Fin_compare params i' i').
+elim (lt_irreflexive _ _ _ f (refl_equal _)).
+specializer; assumption.
+elim (lt_irreflexive _ _ _ f (refl_equal _)).
+
+repeat specializer; simpl.
+destruct (Fin_compare params i' i).
+exact I.
+elim (lt_irreflexive _ _ _ f e).
+elim (lt_asymm _ _ _ f f0).
+
+(** giving up **)
+
 Admitted.
 
 End Reg.

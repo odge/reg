@@ -62,15 +62,62 @@ match goal with H : ~ _ |- _ =>
 reflexivity.
 Defined.
 
+Definition eq_Fin n (i j : Fin n) : i = j \/ i <> j.
+intros n i j; destruct (eq_Fin_dec n i j); [ left | right ]; auto.
+Defined.
+
 Fixpoint nat_of_Fin n (i : Fin n) : nat :=
   match i with
     | fz _ => O
     | fs _ i => S (nat_of_Fin _ i)
   end.
 
-Theorem nat_of_Fin_injective n (i j : Fin n) : nat_of_Fin n i = nat_of_Fin n j -> i = j.
-(* difficult proof due to type errors *)
-Admitted.
+Theorem Fin_destruct n (i : Fin (S n)) : { j : Fin n & i = fs j } + { i = fz n }.
+(* TODO; rewrite this proof *)
+intros n i.
+assert (
+  forall n', n = n' ->
+    { j : Fin n' & INeq Fin i (fs j) } + { INeq Fin i (fz n') }
+).
+intros.
+refine (match i as i' in Fin Sn return Sn = S n -> {j : Fin n' &  INeq Fin i' (fs j)} + {INeq Fin i' (fz n')} with
+          | fz _ => _
+          | fs _ _ => _
+        end (refl_equal (S n))).
+intros; right; subst.
+injection H0.
+intro; subst.
+reflexivity.
+intro H'; injection H'; intros; subst.
+left; exists f.
+reflexivity.
+
+destruct (H n (refl_equal n)).
+destruct s.
+left; exists x.
+rewrite i0.
+apply eq_nat_dec.
+reflexivity.
+right.
+rewrite i0.
+apply eq_nat_dec.
+reflexivity.
+Defined.
+
+Lemma nat_of_Fin_injective n (i j : Fin n) :
+  nat_of_Fin n i = nat_of_Fin n j -> i = j.
+induction n.
+inversion i.
+intros i j;
+(destruct (Fin_destruct n i) as [iD|iE]; [ destruct iD as [ i' iE ] |]);
+(destruct (Fin_destruct n j) as [jD|jE]; [ destruct jD as [ j' jE ] |]);
+try rewrite iE;
+try rewrite jE;
+simpl; try (intro Q; discriminate Q || reflexivity).
+intro Q; injection Q; intro Q'.
+rewrite (IHn i' j' Q').
+reflexivity.
+Defined.
 
 Definition Fin_lt n : Fin n -> Fin n -> Prop.
 exact (fun n i j => nat_of_Fin n i < nat_of_Fin n j).
