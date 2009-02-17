@@ -295,4 +295,75 @@ Eval compute in generic_compare
   true true.
 (* EQ *)
 
-(* etc.... *)
+
+Definition nat_code := Summ Unit Loop.
+Fixpoint nat_codify (n : nat) : value nat_code 0 no_Fin0 nat_code :=
+  match n with
+    | O => Inl _ _ _ _ _ (The _ _ _)
+    | S n => Inr _ _ _ _ _ (Rec _ _ _ (nat_codify n))
+  end.
+Theorem nat_codify_faithful : forall x y : nat, nat_codify x = nat_codify y -> x = y.
+fix 1; destruct x; destruct y; simpl; intros.
+reflexivity.
+discriminate.
+discriminate.
+injection H; intros H'; rewrite (nat_codify_faithful _ _ H').
+reflexivity.
+Defined.
+
+Definition nat_compare := generic_compare
+  nat nat_code 0 no_Fin0 (fun i => no_Fin0 i) (fun i => no_Fin0 i)
+  nat_codify nat_codify_faithful.
+
+Eval compute in nat_compare
+  3 5.
+(* LT *)
+
+Eval compute in nat_compare
+  7 7.
+(* EQ *)
+
+
+Section Parametrized_Example.
+
+Variable param : Type.
+Variable paramLt : param -> param -> Prop.
+Variable paramCompare : forall i j : param, Compare paramLt (@eq _) i j.
+
+Definition list_code := Summ Unit (Prod Para Loop).
+Fixpoint list_codify (l : list param) : value list_code 1 (fun _ => param) list_code :=
+  match l with
+    | nil => Inl _ _ _ _ _ (The _ _ _)
+    | x :: xs => Inr _ _ _ _ _ (And _ _ _ _ _ (Get _ 1 (fun _ => param) (fz 0) x) (Rec _ _ _ (list_codify xs)))
+  end.
+Theorem list_codify_faithful : forall x y : list param, list_codify x = list_codify y -> x = y.
+fix 1; destruct x; destruct y; simpl; intro.
+reflexivity.
+discriminate.
+discriminate.
+injection H; intros.
+rewrite (list_codify_faithful _ _ H0).
+rewrite H1.
+reflexivity.
+Defined.
+
+End Parametrized_Example.
+
+
+Definition nat_lt (x y : nat) :=
+  value_lt nat_code 0 no_Fin0 (fun i : Fin 0 => no_Fin0 i) nat_code
+  (nat_codify x) (nat_codify y).
+
+Eval compute in generic_compare
+  (list nat) list_code 1
+  (fun _ => nat)
+  (fun _ => nat_lt)
+  (fun _ => nat_compare)
+  (list_codify nat)
+  (list_codify_faithful nat)
+  (2 :: 3 :: nil)
+  (2 :: 3 :: 4 :: nil).
+(* LT *)
+
+End Examples.
+
