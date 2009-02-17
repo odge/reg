@@ -81,6 +81,16 @@ end.
 Defined.
 
 
+Ltac snap_Summ :=
+  match goal with Q : Summ _ _ = Summ _ _ |- _ =>
+    injection Q; intro; intro; clear Q
+  end.
+
+Ltac snap_Prod :=
+  match goal with Q : Prod _ _ = Prod _ _ |- _ =>
+    injection Q; intro; intro; clear Q
+  end.
+
 Ltac specializer :=
   (match goal with Q : ?x = ?y |- _ =>
      (subst x || subst y); clear Q end) ||
@@ -90,10 +100,17 @@ Ltac specializer :=
          clear Q end) ||
   (match goal with Q : ?i = ?i |- _ =>
      rewrite (eq_proofs_unicity (eq_Fin params) Q (refl_equal _)) in *;
-       clear Q; simpl in * end).
+       clear Q; simpl in * end) ||
+  snap_Summ ||
+  snap_Prod.
 
 Ltac finish :=
   exact I || reflexivity || assumption.
+
+Ltac typ_specialize Q :=
+  generalize dependent Q; repeat specializer; intro Q; intros;
+    rewrite (eq_proofs_unicity eq_type Q (refl_equal _)) in *;
+      simpl in *.
 
 Definition value_compare (ρ : type) (x y : value ρ) : Compare (value_lt ρ) (@eq (value ρ)) x y.
 refine (fix value_compare (ρ : type) (x y : value ρ) {struct x} : Compare (value_lt ρ) (@eq (value ρ)) x y := _).
@@ -166,12 +183,8 @@ match goal with
   | |- False => discriminate
   | _ => congruence
 end;
-try solve [ repeat specializer; finish ].
-
-Lemma lt_irreflexive n : forall i j : Fin n, Fin_lt n i j -> i <> j.
-Admitted.
-Lemma lt_asymm n : forall i j : Fin n, Fin_lt n i j -> Fin_lt n j i -> False.
-Admitted.
+try solve [ repeat specializer; finish ];
+try solve [ repeat specializer; typ_specialize Q; finish ].
 
 
 repeat specializer; simpl.
@@ -198,9 +211,32 @@ exact I.
 elim (lt_irreflexive _ _ _ f e).
 elim (lt_asymm _ _ _ f f0).
 
-(** giving up **)
+repeat specializer.
+injection e1; intro; clear e1.
+typ_specialize Q.
+left; assumption.
 
-Admitted.
+repeat specializer.
+typ_specialize Q';
+typ_specialize Q.
+right; split; auto.
+
+repeat specializer.
+typ_specialize Q';
+typ_specialize Q.
+reflexivity.
+
+repeat specializer.
+typ_specialize Q';
+typ_specialize Q.
+right; split; auto.
+
+repeat specializer.
+injection e1; intro; clear e1.
+typ_specialize Q.
+left; assumption.
+
+Defined.
 
 End Reg.
 
@@ -221,7 +257,7 @@ Variable codify_faithful : forall x y, codify x = codify y -> x = y.
 Theorem generic_compare : forall x y : T,
   Compare (fun x y => value_lt Φ params paramType paramLt Φ (codify x) (codify y)) (@eq _) x y.
 intros x y.
-destruct (value_compare Φ params paramType paramLt Φ (codify x) (codify y));
+destruct (value_compare Φ params paramType paramLt paramCompare Φ (codify x) (codify y));
   [ apply LT | apply EQ | apply GT ].
 assumption.
 apply codify_faithful; assumption.
@@ -229,3 +265,34 @@ assumption.
 Defined.
 
 End Gen.
+
+
+Section Examples.
+
+Definition bool_code := Summ Unit Unit.
+Definition bool_codify (b : bool) : value bool_code 0 no_Fin0 bool_code :=
+  match b with
+    | true => Inl _ _ _ _ _ (The _ _ _)
+    | false => Inr _ _ _ _ _ (The _ _ _)
+  end.
+Theorem bool_codify_faithful : forall x y : bool, bool_codify x = bool_codify y -> x = y.
+destruct x; destruct y; simpl; intros.
+reflexivity.
+discriminate.
+discriminate.
+reflexivity.
+Defined.
+
+Eval compute in generic_compare
+  bool bool_code 0 no_Fin0 (fun i => no_Fin0 i) (fun i => no_Fin0 i)
+  bool_codify bool_codify_faithful
+  true false.
+(* LT *)
+
+Eval compute in generic_compare
+  bool bool_code 0 no_Fin0 (fun i => no_Fin0 i) (fun i => no_Fin0 i)
+  bool_codify bool_codify_faithful
+  true true.
+(* EQ *)
+
+(* etc.... *)

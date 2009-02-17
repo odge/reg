@@ -5,6 +5,10 @@ Inductive Fin : nat -> Set :=
 | fz n : Fin (S n)
 | fs {n} : Fin n -> Fin (S n).
 
+Theorem no_Fin0 {P} : Fin 0 -> P.
+intros P x; inversion x.
+Defined.
+
 Definition NoConfusion_Fin n (i j : Fin n) : Prop :=
   match i, j with
     | fz _, fz _ => True
@@ -121,6 +125,20 @@ Defined.
 
 Definition Fin_lt n : Fin n -> Fin n -> Prop.
 exact (fun n i j => nat_of_Fin n i < nat_of_Fin n j).
+Defined.
+
+Require Import Omega.
+
+Lemma lt_irreflexive n : forall i j : Fin n, Fin_lt n i j -> i <> j.
+unfold Fin_lt; intros; intro.
+assert (nat_of_Fin n i <> nat_of_Fin n j).
+omega.
+apply H1; congruence.
+Defined.
+
+Lemma lt_asymm n : forall i j : Fin n, Fin_lt n i j -> Fin_lt n j i -> False.
+unfold Fin_lt; intros.
+omega.
 Defined.
 
 Definition Fin_compare n : forall i j : Fin n, Compare (Fin_lt n) (@eq (Fin n)) i j.
